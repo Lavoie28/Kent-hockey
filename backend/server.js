@@ -4,6 +4,7 @@ const dotenv = require('dotenv');
 const cors = require('cors');
 const https = require('https');
 const fs = require('fs');
+const cheerio = require('cheerio');
 
 dotenv.config();
 
@@ -93,6 +94,20 @@ app.get('/api/roster/:teamKey', async (req, res) => {
   } catch (error) {
     console.error('Erreur roster:', error.response?.data || error.message);
     res.status(500).json({ error: 'Erreur lecture roster' });
+  }
+});
+
+app.get('/api/projections/:leagueKey', async (req, res) => {
+  if (!tokenData) return res.status(401).json({ error: 'Non connecté' });
+  try {
+    const response = await axios.get(
+      `https://fantasysports.yahooapis.com/fantasy/v2/league/${req.params.leagueKey}/players;status=A;sort=PTS;count=200/stats;type=season?format=json`,
+      { headers: { Authorization: `Bearer ${tokenData.access_token}` } }
+    );
+    res.json(response.data);
+  } catch (error) {
+    console.error('Erreur projections:', error.response?.data || error.message);
+    res.status(500).json({ error: 'Erreur lecture projections' });
   }
 });
 
