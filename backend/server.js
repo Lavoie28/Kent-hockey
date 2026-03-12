@@ -12,23 +12,18 @@ app.use(cors());
 app.use(express.json());
 
 const PORT = process.env.PORT || 3001;
-
-// Stockage temporaire du token
 let tokenData = null;
 
-// Certificats SSL
 const sslOptions = {
   key: fs.readFileSync('./localhost-key.pem'),
   cert: fs.readFileSync('./localhost.pem'),
 };
 
-// Étape 1 : Rediriger vers Yahoo
 app.get('/auth/yahoo', (req, res) => {
   const authUrl = `https://api.login.yahoo.com/oauth2/request_auth?client_id=${process.env.YAHOO_CLIENT_ID}&redirect_uri=${process.env.REDIRECT_URI}&response_type=code&language=en-us`;
   res.redirect(authUrl);
 });
 
-// Étape 2 : Récupérer le token
 app.get('/auth/callback', async (req, res) => {
   const code = req.query.code;
   try {
@@ -48,32 +43,56 @@ app.get('/auth/callback', async (req, res) => {
       }
     );
     tokenData = response.data;
-    res.redirect('https://localhost:5174?connected=true');
+    res.redirect(`${process.env.FRONTEND_URL}?connected=true`);
   } catch (error) {
     console.error('Erreur OAuth:', error.response?.data || error.message);
     res.status(500).json({ error: 'Erreur de connexion Yahoo' });
   }
 });
 
-// Étape 3 : Vérifier si connecté
 app.get('/auth/status', (req, res) => {
   res.json({ connected: !!tokenData });
 });
 
-// Étape 4 : Lire les ligues Yahoo
 app.get('/api/leagues', async (req, res) => {
   if (!tokenData) return res.status(401).json({ error: 'Non connecté' });
   try {
     const response = await axios.get(
       'https://fantasysports.yahooapis.com/fantasy/v2/users;use_login=1/games;game_keys=nhl/leagues?format=json',
-      {
-        headers: { Authorization: `Bearer ${tokenData.access_token}` },
-      }
+      { headers: { Authorization: `Bearer ${tokenData.access_token}` } }
     );
     res.json(response.data);
   } catch (error) {
     console.error('Erreur API Yahoo:', error.response?.data || error.message);
     res.status(500).json({ error: 'Erreur lecture ligue' });
+  }
+});
+
+app.get('/api/standings/:leagueKey', async (req, res) => {
+  if (!tokenData) return res.status(401).json({ error: 'Non connecté' });
+  try {
+    const response = await axios.get(
+      `https://fantasysports.yahooapis.com/fantasy/v2/league/${req.params.leagueKey}/standings?format=json`,
+      { headers: { Authorization: `Bearer ${tokenData.access_token}` } }
+    );
+    res.json(response.data);
+  } catch (error) {
+    console.error('Erreur standings:', error.response?.data || error.message);
+    res.status(500).json({ error: 'Erreur lecture standings' });
+  }
+});
+
+app.get('/api/roster/:teamKey', async (req, res) => {
+  if (!tokenData) return res.status(401).json({ error: 'Non connecté' });
+  try {
+    const response = await axios.get(
+      `https://fantasysports.yahooapis.com/fantasy/v2/team/${req.params.teamKey}/roster/players?format=json`,
+      { headers: { Authorization: `Bearer ${tokenData.access_token}` } }
+    );
+    res.json(response.data);
+  } catch (error) {
+    console.error('Erreur roster:', error.response?.data || error.message);
+    res.status(500).json({ error: 'Erreur lecture roster' });
   }
 });
 
